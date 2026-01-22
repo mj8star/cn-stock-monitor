@@ -1,0 +1,35 @@
+name: 每日数据采集
+
+on:
+  schedule:
+    - cron: '0 22 * * *' 
+  workflow_dispatch: 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 授予推送权限，否则最后一步 push 会报错
+    permissions:
+      contents: write
+      
+    steps:
+      - uses: actions/checkout@v4 # 建议升级到 v4
+
+      - name: 安装 uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: 设置 Python 3.10 并安装依赖
+        # 使用 uv 直接运行并指定 python 版本，uv 会自动下载对应的 python
+        run: |
+          uv run collector.py
+
+      - name: 提交数据库更新
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          # 如果 stocks.db 有变化才提交，防止报错
+          if [ -f stock_data.db ]; then
+            git add stock_data.db
+            git commit -m "自动更新数据: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+            git push
+          fi
